@@ -1,7 +1,3 @@
-package lz4
-
-import "core:c"
-
 /*
  *  LZ4 - Fast LZ compression algorithm
  *  Header File
@@ -36,6 +32,9 @@ import "core:c"
     - LZ4 homepage : http://www.lz4.org
     - LZ4 source repository : https://github.com/lz4/lz4
 */
+package lz4
+
+import "core:c"
 
 /**
   Introduction
@@ -83,6 +82,7 @@ versionString :: proc() -> cstring ---
 /*-************************************
 *  Simple Functions
 **************************************/
+
 /*! compress_default() :
  *  Compresses 'srcSize' bytes from buffer 'src'
  *  into already allocated 'dst' buffer of size 'dstCapacity'.
