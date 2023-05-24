@@ -72,11 +72,28 @@ VERSION_MINOR ::    9    /* for new (non-breaking) interface capabilities */
 VERSION_RELEASE ::  4    /* for tweaks, bug-fixes, or development */
 VERSION :: VERSION_MAJOR * 100 * 100 + VERSION_MINOR * 100 + VERSION_RELEASE
 
+MAX_INPUT_SIZE :: 0x7E000000   /* 2 113 929 216 bytes */
+
+when ODIN_OS == .Windows {
+  when ODIN_DEBUG {
+    foreign import lib {
+      "lz4_windows_x64_debug.lib",
+    }
+  } else {
+    foreign import lib {
+      "lz4_windows_x64_release.lib",
+    }
+  }
+}
+
+@(default_calling_convention ="c", link_prefix="LZ4_")
+foreign lib {
+
 /**< library version number useful to check dll version requires v1.3.0+ */
 versionNumber :: proc() -> c.int ---
 
 /**< library version string useful to check dll version requires v1.7.5+ */
-versionString :: proc() -> cstring ---
+versionString :: proc() -> rawptr ---
 
 
 /*-************************************
@@ -97,7 +114,7 @@ versionString :: proc() -> cstring ---
  *                or 0 if compression fails
  * Note : This function is protected against buffer overflow scenarios (never writes outside 'dst' buffer, nor read outside 'source' buffer).
  */
-compress_default :: proc(src : cstring, dst : cstring, srcSize : c.int, dstCapacity : c.int) -> c.int ---
+compress_default :: proc(src: rawptr, dst: rawptr, srcSize: c.int, dstCapacity: c.int) -> c.int ---
 
 /*! decompress_safe() :
  * @compressedSize : is the exact complete size of the compressed block.
@@ -114,16 +131,15 @@ compress_default :: proc(src : cstring, dst : cstring, srcSize : c.int, dstCapac
  *          The implementation is free to send / store / derive this information in whichever way is most beneficial.
  *          If there is a need for a different format which bundles together both compressed data and its metadata, consider looking at lz4frame.h instead.
  */
-decompress_safe :: proc(src : cstring, dst : cstring, compressedSize : c.int, dstCapacity : c.int) -> c.int ---
+decompress_safe :: proc(src: rawptr, dst: rawptr, compressedSize: c.int, dstCapacity: c.int) -> c.int ---
 
 
 /*-************************************
 *  Advanced Functions
 **************************************/
-MAX_INPUT_SIZE :: 0x7E000000   /* 2 113 929 216 bytes */
 
 // TODO
-COMPRESSBOUND :: proc(isize)  ((unsigned)(isize) > (unsigned)MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16) -> // #define ---
+// COMPRESSBOUND :: proc(isize)  ((unsigned)(isize) > (unsigned)MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16) -> // #define ---
 
 /*! compressBound() :
     Provides the maximum size that LZ4 compression may output in a "worst case" scenario (input data not compressible)
@@ -134,7 +150,7 @@ COMPRESSBOUND :: proc(isize)  ((unsigned)(isize) > (unsigned)MAX_INPUT_SIZE ? 0 
         return : maximum output size in a "worst case" scenario
               or 0, if input size is incorrect (too large or negative)
 */
-compressBound :: proc(inputSize : c.int) -> c.int ---
+compressBound :: proc(inputSize: c.int) -> c.int ---
 
 /*! compress_fast() :
     Same as compress_default(), but allows selection of "acceleration" factor.
@@ -144,7 +160,7 @@ compressBound :: proc(inputSize : c.int) -> c.int ---
     Values <= 0 will be replaced by ACCELERATION_DEFAULT (currently == 1, see lz4.c).
     Values > ACCELERATION_MAX will be replaced by ACCELERATION_MAX (currently == 65537, see lz4.c).
 */
-compress_fast :: proc(src : cstring, dst : cstring, srcSize : c.int, dstCapacity : c.int, acceleration : c.int) -> c.int ---
+compress_fast :: proc(src: rawptr, dst: rawptr, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
 
 
 /*! compress_fast_extState() :
@@ -153,8 +169,8 @@ compress_fast :: proc(src : cstring, dst : cstring, srcSize : c.int, dstCapacity
  *  and allocate it on 8-bytes boundaries (using `malloc()` typically).
  *  Then, provide this buffer as `void* state` to compression function.
  */
-sizeofState :: proc(void) -> c.int ---
-compress_fast_extState :: proc(void* state, src : cstring, dst : cstring, srcSize : c.int, dstCapacity : c.int, acceleration : c.int) -> c.int ---
+sizeofState :: proc() -> c.int ---
+compress_fast_extState :: proc(state: rawptr, src: rawptr, dst: rawptr, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
 
 
 /*! compress_destSize() :
@@ -180,7 +196,7 @@ compress_fast_extState :: proc(void* state, src : cstring, dst : cstring, srcSiz
  *        a dstCapacity which is > decompressedSize, by at least 1 byte.
  *        See https://github.com/lz4/lz4/issues/859 for details
  */
-compress_destSize :: proc(src : cstring, dst : cstring, srcSizePtr: c.int, targetDstSize : c.int) -> c.int ---
+compress_destSize :: proc(src: rawptr, dst: rawptr, srcSizePtr: c.int, targetDstSize: c.int) -> c.int ---
 
 
 /*! decompress_safe_partial() :
@@ -217,4 +233,5 @@ compress_destSize :: proc(src : cstring, dst : cstring, srcSizePtr: c.int, targe
  *           then targetOutputSize **MUST** be <= block's decompressed size.
  *           Otherwise, *silent corruption will occur*.
  */
-decompress_safe_partial :: proc(src : cstring, dst : cstring, srcSize : c.int, targetOutputSize : c.int, dstCapacity : c.int) -> c.int ---
+decompress_safe_partial :: proc(src: rawptr, dst: rawptr, srcSize: c.int, targetOutputSize: c.int, dstCapacity: c.int) -> c.int ---
+} // foregin lib
