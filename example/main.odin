@@ -34,7 +34,7 @@ quo voluptas nulla pariatur? In rutrum. Temporibus autem quibusdam
         ACCELERATIONS :: [?]i32{lz4.ACCELERATION_DEFAULT, 100, 1000, 10000, lz4.ACCELERATION_MAX}
 
         for accel, i in ACCELERATIONS {
-            if comp, comp_ok := lz4.compress(src, accel, context.temp_allocator); comp_ok {
+            if comp, comp_ok := lz4.compress_slice(src, accel, context.temp_allocator); comp_ok {
                 fmt.print(
                     "[",
                     i,
@@ -46,7 +46,7 @@ quo voluptas nulla pariatur? In rutrum. Temporibus autem quibusdam
                     f32(len(src)) / f32(len(comp)),
                 )
 
-                if decomp, decomp_ok := lz4.decompress(comp, decomp_buf); decomp_ok {
+                if decomp, decomp_ok := lz4.decompress_slice(comp, decomp_buf); decomp_ok {
                     fmt.println(" decompressed_correctly:", slice.equal(src, decomp))
                 }
             }

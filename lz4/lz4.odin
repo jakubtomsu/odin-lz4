@@ -1,43 +1,3 @@
-/*
- *  LZ4 - Fast LZ compression algorithm
- *  Header File
- *  Copyright (C) 2011-2020, Yann Collet.
-
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-
-       * Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above
-   copyright notice, this list of conditions and the following disclaimer
-   in the documentation and/or other materials provided with the
-   distribution.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES LOSS OF USE,
-   DATA, OR PROFITS OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-   You can contact the author at :
-    - LZ4 homepage : http://www.lz4.org
-    - LZ4 source repository : https://github.com/lz4/lz4
-*/
-package lz4
-
-import "core:c"
-
-// Introduction
-// 
 // LZ4 is lossless compression algorithm, providing compression speed >500 MB/s per core,
 // scalable with multi-cores CPU. It features an extremely fast decoder, with speed in
 // multiple GB/s per core, typically reaching RAM speed limits on multi-core systems.
@@ -63,33 +23,33 @@ import "core:c"
 // Embedding metadata is required for compressed data to be self-contained and portable.
 // Frame format is delivered through a companion API, declared in lz4frame.h.
 // The `lz4` CLI can only manage frames.
+package lz4
+
+import "core:c"
+
+
+// Note: to tweak the constants you also need to recompile the C files!
 
 // Version
 
-VERSION_MAJOR :: 1 /* for breaking interface changes  */
-VERSION_MINOR :: 9 /* for new (non-breaking) interface capabilities */
-VERSION_RELEASE :: 4 /* for tweaks, bug-fixes, or development */
+VERSION_MAJOR :: 1 // for breaking interface changes
+VERSION_MINOR :: 9 // for new (non-breaking) interface capabilities
+VERSION_RELEASE :: 4 // for tweaks, bug-fixes, or development
 VERSION :: VERSION_MAJOR * 100 * 100 + VERSION_MINOR * 100 + VERSION_RELEASE
 
-MAX_INPUT_SIZE :: 0x7E000000 /* 2 113 929 216 bytes */
-
+MAX_INPUT_SIZE :: 0x7E000000 // 2 113 929 216 bytes
 
 // Select "acceleration" for compress_fast() when parameter value <= 0
 ACCELERATION_DEFAULT :: 1
 // Any "acceleration" value higher than this threshold get treated as ACCELERATION_MAX instead (fix #876)
 ACCELERATION_MAX :: 65537
 
-
 when ODIN_OS == .Windows {
     when ODIN_DEBUG {
-        foreign import lib "lz4_windows_x64_debug.lib"
+        foreign import lib {"lz4_windows_x64_debug.lib", "lz4hc_windows_x64_debug.lib"}
     } else {
-        foreign import lib "lz4_windows_x64_release.lib"
+        foreign import lib {"lz4_windows_x64_release.lib", "lz4hc_windows_x64_release.lib"}
     }
-}
-
-COMPRESSBOUND :: #force_inline proc($S: uint) -> uint {
-    return S > MAX_INPUT_SIZE ? 0 : S + (S / 255) + 16
 }
 
 @(default_calling_convention = "c", link_prefix = "LZ4_")
@@ -98,7 +58,7 @@ foreign lib {
     versionNumber :: proc() -> c.int ---
 
     // library version string useful to check dll version requires v1.7.5+
-    versionString :: proc() -> rawptr ---
+    versionString :: proc() -> cstring ---
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Simple Functions
@@ -117,7 +77,7 @@ foreign lib {
     //               or 0 if compression fails
     // Note : This function is protected against buffer overflow scenarios
     //  (never writes outside 'dst' buffer, nor read outside 'source' buffer).
-    compress_default :: proc(src: rawptr, dst: rawptr, srcSize: c.int, dstCapacity: c.int) -> c.int ---
+    compress_default :: proc(src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int) -> c.int ---
 
     // compressedSize: is the exact complete size of the compressed block.
     // @dstCapacity : is the size of destination buffer (which must be already allocated),
@@ -132,7 +92,7 @@ foreign lib {
     // Note 2 : compressedSize and dstCapacity must be provided to the function, the compressed block does not contain them.
     //          The implementation is free to send / store / derive this information in whichever way is most beneficial.
     //          If there is a need for a different format which bundles together both compressed data and its metadata, consider looking at lz4frame.h instead.
-    decompress_safe :: proc(src: rawptr, dst: rawptr, compressedSize: c.int, dstCapacity: c.int) -> c.int ---
+    decompress_safe :: proc(src: [^]byte, dst: [^]byte, compressedSize: c.int, dstCapacity: c.int) -> c.int ---
 
 
     ////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,14 +113,14 @@ foreign lib {
     // An acceleration value of "1" is the same as regular compress_default()
     // Values <= 0 will be replaced by ACCELERATION_DEFAULT (currently == 1, see lz4.c).
     // Values > ACCELERATION_MAX will be replaced by ACCELERATION_MAX (currently == 65537, see lz4.c).
-    compress_fast :: proc(src: rawptr, dst: rawptr, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
+    compress_fast :: proc(src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
 
 
     // Same as compress_fast(), using an externally allocated memory space for its state.
     // Use sizeofState() to know how much memory must be allocated,
     // and allocate it on 8-bytes boundaries (using `malloc()` typically).
     // Then, provide this buffer as `void* state` to compression function.
-    compress_fast_extState :: proc(state: rawptr, src: rawptr, dst: rawptr, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
+    compress_fast_extState :: proc(state: rawptr, src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
     sizeofState :: proc() -> c.int ---
 
     // Reverse the logic : compresses as much data as possible from 'src' buffer
@@ -184,8 +144,7 @@ foreign lib {
     //        the receiving decompression function should provide
     //        a dstCapacity which is > decompressedSize, by at least 1 byte.
     //        See https://github.com/lz4/lz4/issues/859 for details
-    compress_destSize :: proc(src: rawptr, dst: rawptr, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
-
+    compress_destSize :: proc(src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
 
     // Decompress an LZ4 compressed block, of size 'srcSize' at position 'src',
     // into destination buffer 'dst' of size 'dstCapacity'.
@@ -219,5 +178,230 @@ foreign lib {
     // Note 5 : If srcSize is _larger_ than block's compressed size,
     //           then targetOutputSize **MUST** be <= block's decompressed size.
     //           Otherwise, *silent corruption will occur*.
-    decompress_safe_partial :: proc(src: rawptr, dst: rawptr, srcSize: c.int, targetOutputSize: c.int, dstCapacity: c.int) -> c.int ---
+    decompress_safe_partial :: proc(src: [^]byte, dst: [^]byte, srcSize: c.int, targetOutputSize: c.int, dstCapacity: c.int) -> c.int ---
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Streaming Functions
+    //
+
+    // Allocates a stream with the LZ4 allocation functions.
+    createStream :: proc() -> ^stream_t ---
+
+    // Free stream from createStream
+    freeStream :: proc(streamPtr: ^stream_t) -> c.int ---
+
+    // Use this to prepare an stream_t for a new chain of dependent blocks
+    // (e.g., compress_fast_continue()).
+    // 
+    // An stream_t must be initialized once before usage.
+    // This is automatically done when created by createStream().
+    // However, should the stream_t be simply declared on stack (for example),
+    // it's necessary to initialize it first, using initStream().
+    // 
+    // After init, start any new stream with resetStream_fast().
+    // A same stream_t can be re-used multiple times consecutively
+    // and compress multiple streams,
+    // provided that it starts each new stream with resetStream_fast().
+    // 
+    // resetStream_fast() is much faster than initStream(),
+    // but is not compatible with memory regions containing garbage data.
+    // 
+    // Note: it's only useful to call resetStream_fast()
+    // in the context of streaming compression.
+    // The *extState* functions perform their own resets.
+    // Invoking resetStream_fast() before is redundant, and even counterproductive.
+    resetStream_fast :: proc(streamPtr: ^stream_t) ---
+
+    // Use this function to reference a static dictionary into stream_t.
+    // The dictionary must remain available during compression.
+    // loadDict() triggers a reset, so any previous data will be forgotten.
+    // The same dictionary will have to be loaded on decompression side for successful decoding.
+    // Dictionary are useful for better compression of small data (KB range).
+    // While LZ4 accept any input as dictionary,
+    // results are generally better when using Zstandard's Dictionary Builder.
+    // Loading a size of 0 is allowed, and is the same as reset.
+    //
+    // @return : loaded dictionary size, in bytes (necessarily <= 64 KB)
+    loadDict :: proc(streamPtr: ^stream_t, dictionary: [^]byte, dictSize: c.int) -> c.int ---
+
+    // Compress 'src' content using data from previously compressed blocks, for better compression ratio.
+    // 'dst' buffer must be already allocated.
+    // If dstCapacity >= compressBound(srcSize), compression is guaranteed to succeed, and runs faster.
+    // 
+    // @return : size of compressed block or 0 if there is an error (typically, cannot fit into 'dst').
+    // 
+    // Note 1 : Each invocation to compress_fast_continue() generates a new block.
+    // Each block has precise boundaries.
+    // Each block must be decompressed separately, calling decompress_*() with relevant metadata.
+    // It's not possible to append blocks together and expect a single invocation of decompress_*() to decompress them together.
+    // 
+    // Note 2 : The previous 64KB of source data is __assumed__ to remain present, unmodified, at same address in memory !
+    // 
+    // Note 3 : When input is structured as a double-buffer, each buffer can have any size, including < 64 KB.
+    // Make sure that buffers are separated, by at least one byte.
+    // This construction ensures that each block only depends on previous block.
+    // 
+    // Note 4 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
+    // 
+    // Note 5 : After an error, the stream status is undefined (invalid), it can only be reset or freed.
+    compress_fast_continue :: proc(streamPtr: ^stream_t, src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
+
+    // If last 64KB data cannot be guaranteed to remain available at its current memory location,
+    // save it into a safer place (char* safeBuffer).
+    // This is schematically equivalent to a memcpy() followed by loadDict(),
+    // but is much faster, because saveDict() doesn't need to rebuild tables.
+    // 
+    // @return : saved dictionary size in bytes (necessarily <= maxDictSize), or 0 if error.
+    saveDict :: proc(streamPtr: ^stream_t, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // LZ4 HC (high compression)
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Block Compression
+    //
+
+    // Compress data from `src` into `dst`, using the powerful but slower "HC" algorithm.
+    // `dst` must be already allocated.
+    // Compression is guaranteed to succeed if `dstCapacity >= compressBound(srcSize)` (see "lz4.h")
+    // Max supported `srcSize` value is MAX_INPUT_SIZE (see "lz4.h")
+    // `compressionLevel` : any value between 1 and HC_CLEVEL_MAX will work.
+    // Values > HC_CLEVEL_MAX behave the same as HC_CLEVEL_MAX.
+    // Note: Decompression functions are provided within "lz4.h" (BSD license)
+    //
+    // @return : the number of bytes written into 'dst' or 0 if compression fails.
+    compress_HC :: proc(src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, compressionLevel: c.int) -> c.int ---
+
+
+    // Same as compress_HC(), but using an externally allocated memory segment for `state`.
+    // `state` size is provided by sizeofStateHC().
+    // Memory segment must be aligned on 8-bytes boundaries (which a normal malloc() should do properly).
+    compress_HC_extStateHC :: proc(stateHC: rawptr, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int, compressionLevel: c.int) -> c.int ---
+    sizeofStateHC :: proc() -> c.int ---
+
+
+    // Will compress as much data as possible from `src` to fit into `targetDstSize` budget.
+    // Result is provided in 2 parts :
+    // @return : the number of bytes written into 'dst' (necessarily <= targetDstSize)
+    // or 0 if compression fails.
+    // `srcSizePtr` : on success, *srcSizePtr is updated to indicate how much bytes were read from `src`
+    compress_HC_destSize :: proc(stateHC: rawptr, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int, compressionLevel: c.int) -> c.int ---
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Streaming Compression
+    // Bufferless synchronous API
+    //
+
+    // These functions create and release memory for LZ4 HC streaming state.
+    // Newly created states are automatically initialized.
+    // A same state can be used multiple times consecutively,
+    // starting with resetStreamHC_fast() to start a new stream of blocks.
+    createStreamHC :: proc() -> ^streamHC_t ---
+    freeStreamHC :: proc(streamHCPtr: ^streamHC_t) -> c.int ---
+
+    // These functions compress data in successive blocks of any size,
+    // using previous blocks as dictionary, to improve compression ratio.
+    // One key assumption is that previous blocks (up to 64 KB) remain read-accessible while compressing next blocks.
+    // There is an exception for ring buffers, which can be smaller than 64 KB.
+    // Ring-buffer scenario is automatically detected and handled within compress_HC_continue().
+    // 
+    // Before starting compression, state must be allocated and properly initialized.
+    // createStreamHC() does both, though compression level is set to HC_CLEVEL_DEFAULT.
+    // 
+    // Selecting the compression level can be done with resetStreamHC_fast() (starts a new stream)
+    // or setCompressionLevel() (anytime, between blocks in the same stream) (experimental).
+    // resetStreamHC_fast() only works on states which have been properly initialized at least once,
+    // which is automatically the case when state is created using createStreamHC().
+    // 
+    // After reset, a first "fictional block" can be designated as initial dictionary,
+    // using loadDictHC() (Optional).
+    // 
+    // Invoke compress_HC_continue() to compress each successive block.
+    // The number of blocks is unlimited.
+    // Previous input blocks, including initial dictionary when present,
+    // must remain accessible and unmodified during compression.
+    // 
+    // It's allowed to update compression level anytime between blocks,
+    // using setCompressionLevel() (experimental).
+    // 
+    // 'dst' buffer should be sized to handle worst case scenarios
+    // (see compressBound(), it ensures compression success).
+    // In case of failure, the API does not guarantee recovery,
+    // so the state _must_ be reset.
+    // To ensure compression success
+    // whenever `dst` buffer size cannot be made >= compressBound(),
+    // consider using compress_HC_continue_destSize().
+    // 
+    // Whenever previous input blocks can't be preserved unmodified in-place during compression of next blocks,
+    // it's possible to copy the last blocks into a more stable memory space, using saveDictHC().
+    // Return value of saveDictHC() is the size of dictionary effectively saved into 'safeBuffer' (<= 64 KB)
+    // 
+    // After completing a streaming compression,
+    // it's possible to start a new stream of blocks, using the same streamHC_t state,
+    // just by resetting it, using resetStreamHC_fast().
+
+    resetStreamHC_fast :: proc(streamHCPtr: ^streamHC_t, compressionLevel: c.int) ---
+    loadDictHC :: proc(streamHCPtr: ^streamHC_t, dictionary: [^]byte, dictSize: c.int) -> c.int ---
+
+    compress_HC_continue :: proc(streamHCPtr: ^streamHC_t, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int) -> c.int ---
+
+    // Similar to compress_HC_continue(),
+    // but will read as much data as possible from `src`
+    // to fit into `targetDstSize` budget.
+    // Result is provided into 2 parts :
+    // @return : the number of bytes written into 'dst' (necessarily <= targetDstSize)
+    // or 0 if compression fails.
+    // `srcSizePtr` : on success, *srcSizePtr will be updated to indicate how much bytes were read from `src`.
+    // Note that this function may not consume the entire input.
+    compress_HC_continue_destSize :: proc(streamHCPtr: ^streamHC_t, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
+
+    saveDictHC :: proc(streamHCPtr: ^streamHC_t, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
 } // foregin lib
+
+// Note: this doesn't work in odin (for fixed-size arrays).
+// COMPRESSBOUND :: #force_inline proc($S: uint) -> uint {
+//     return S > MAX_INPUT_SIZE ? 0 : S + (S / 255) + 16
+// }
+
+
+MEMORY_USAGE_MIN :: 10
+MEMORY_USAGE_DEFAULT :: 14
+MEMORY_USAGE_MAX :: 20
+
+// Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
+// Increasing memory usage improves compression ratio, at the cost of speed.
+// Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
+// Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache.
+MEMORY_USAGE :: MEMORY_USAGE_DEFAULT
+
+HASHLOG :: MEMORY_USAGE - 2
+HASHTABLESIZE :: 1 << MEMORY_USAGE
+HASH_SIZE_U32 :: 1 << HASHLOG /* required as macro for static allocation */
+
+@(private)
+stream_t_internal :: struct {
+    hashTable:     [HASH_SIZE_U32]u32,
+    dictionary:    [^]byte,
+    dictCtx:       ^stream_t_internal,
+    currentOffset: u32,
+    tableType:     u32,
+    dictSize:      u32,
+    // Implicit padding to ensure structure is aligned
+}
+
+// static size, for inter-version compatibility
+STREAM_MINSIZE :: ((1 << MEMORY_USAGE) + 32)
+
+// Never use this directly, this is here only for static allocation.
+stream_t :: struct #raw_union {
+    minStateSize:      [STREAM_MINSIZE]byte,
+    internal_donotuse: stream_t_internal,
+}

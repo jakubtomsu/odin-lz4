@@ -2,7 +2,7 @@ package lz4
 
 import "core:mem"
 
-compress :: proc(
+compress_slice :: proc(
     src: []byte,
     acceleration: i32 = ACCELERATION_DEFAULT,
     allocator := context.allocator,
@@ -35,7 +35,7 @@ compress :: proc(
     return nil, false
 }
 
-decompress :: proc(src: []byte, dst: []byte) -> ([]byte, bool) {
+decompress_slice :: proc(src: []byte, dst: []byte) -> ([]byte, bool) {
     decompressed_size := decompress_safe(
         src = &src[0],
         dst = &dst[0],
