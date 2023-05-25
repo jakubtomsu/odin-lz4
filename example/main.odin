@@ -24,54 +24,89 @@ quo voluptas nulla pariatur? In rutrum. Temporibus autem quibusdam
 `,
     )
 
-    //
-    // Compression
-    //
+    fmt.println("Original size:", len(src), "bytes")
 
-    max_dst_size := lz4.compressBound(i32(len(src)))
-    compressed_data := mem.alloc_bytes(int(max_dst_size)) or_else nil
-    assert(compressed_data != nil, "Failed to allocate memory for *compressed_data.")
-    defer delete(compressed_data)
+    // Example of using the odin wrapper
+    {
+        decomp_buf := mem.alloc_bytes(size = len(src), allocator = context.temp_allocator) or_else nil
+        if decomp_buf == nil do return
 
-    compressed_data_size := lz4.compress_default(&src[0], &compressed_data[0], i32(len(src)), max_dst_size)
-    assert(
-        compressed_data_size > 0,
-        "A 0 or negative result from lz4.compress_default() indicates a failure trying to compress the data.",
-    )
-    if compressed_data_size > 0 {
-        fmt.println("We successfully compressed some data!")
-        fmt.println("Compression ratio:", f32(len(src)) / f32(compressed_data_size))
+        ACCELERATIONS :: [?]i32{lz4.ACCELERATION_DEFAULT, 100, 1000, 10000, lz4.ACCELERATION_MAX}
+
+        for accel, i in ACCELERATIONS {
+            if comp, comp_ok := lz4.compress(src, accel, context.temp_allocator); comp_ok {
+                fmt.print(
+                    "[",
+                    i,
+                    "] accel:",
+                    accel,
+                    "compressed_size:",
+                    len(comp),
+                    "compression_ratio:",
+                    f32(len(src)) / f32(len(comp)),
+                )
+
+                if decomp, decomp_ok := lz4.decompress(comp, decomp_buf); decomp_ok {
+                    fmt.println(" decompressed_correctly:", slice.equal(src, decomp))
+                }
+            }
+        }
     }
-    // Not only does a positive return_value mean success, the value returned == the number of bytes required.
-    // You can use this to realloc() *compress_data to free up memory, if desired.  We'll do so just to demonstrate the concept.
-    compressed_data = mem.resize_bytes(compressed_data, int(compressed_data_size)) or_else nil
-    assert(compressed_data != nil, "Failed to re-alloc memory for compressed_data.")
 
-    //
-    // Decompression
-    //
+    // Example of using bindings directly
+    {
+        //
+        // Compression
+        //
 
-    // First, let's create a *new_src location of size src_size since we know that value.
-    regen_buffer := mem.alloc_bytes(len(src)) or_else nil
-    assert(regen_buffer != nil, "Failed to allocate regen_buffer.")
-    defer delete(regen_buffer)
+        max_dst_size := lz4.compressBound(i32(len(src)))
+        compressed_data := mem.alloc_bytes(int(max_dst_size)) or_else nil
+        assert(compressed_data != nil, "Failed to allocate memory for *compressed_data.")
+        defer delete(compressed_data)
 
-    decompressed_size := lz4.decompress_safe(
-        &compressed_data[0],
-        &regen_buffer[0],
-        compressed_data_size,
-        i32(len(src)),
-    )
+        compressed_data_size := lz4.compress_default(
+            &src[0],
+            &compressed_data[0],
+            i32(len(src)),
+            max_dst_size,
+        )
+        assert(
+            compressed_data_size > 0,
+            "A 0 or negative result from lz4.compress_default() indicates a failure trying to compress the data.",
+        )
+        if compressed_data_size > 0 {
+            fmt.println("We successfully compressed some data!")
+            fmt.println("Compression ratio:", f32(len(src)) / f32(compressed_data_size))
+        }
+        // Not only does a positive return_value mean success, the value returned == the number of bytes required.
+        // You can use this to realloc() *compress_data to free up memory, if desired.  We'll do so just to demonstrate the concept.
+        compressed_data = mem.resize_bytes(compressed_data, int(compressed_data_size)) or_else nil
+        assert(compressed_data != nil, "Failed to re-alloc memory for compressed_data.")
 
-    assert(
-        decompressed_size >= 0,
-        "A negative result from lz4.decompress_safe indicates a failure trying to decompress the data.  See exit code (echo $?) for value returned.",
-    )
+        //
+        // Decompression
+        //
 
-    fmt.println("We successfully decompressed some data!")
+        // First, let's create a *new_src location of size src_size since we know that value.
+        regen_buffer := mem.alloc_bytes(len(src)) or_else nil
+        assert(regen_buffer != nil, "Failed to allocate regen_buffer.")
+        defer delete(regen_buffer)
 
-    assert(len(src) == int(decompressed_size), "Decompressed size is different than the source size.")
-    assert(slice.equal(src, regen_buffer[:decompressed_size]), "Decompressed contains different data")
+        decompressed_size := lz4.decompress_safe(
+            &compressed_data[0],
+            &regen_buffer[0],
+            compressed_data_size,
+            i32(len(src)),
+        )
 
-    fmt.println("Validation succeeded. Decompressed data:", transmute(string)regen_buffer)
+        assert(
+            decompressed_size >= 0,
+            "A negative result from lz4.decompress_safe indicates a failure trying to decompress the data.  See exit code (echo $?) for value returned.",
+        )
+
+        fmt.println("We successfully decompressed some data!")
+
+        assert(len(src) == int(decompressed_size), "Decompressed size is different than the source size.")
+        assert(slice.equal(src, regen_buffer[:decompressed_size]), "Decompressed contains different data")
+    }
 }
