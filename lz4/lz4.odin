@@ -46,9 +46,9 @@ ACCELERATION_MAX :: 65537
 
 when ODIN_OS == .Windows {
     when ODIN_DEBUG {
-        foreign import lib {"lz4_windows_x64_debug.lib", "lz4hc_windows_x64_debug.lib"}
+        foreign import lib "lz4_windows_x64_debug.lib"
     } else {
-        foreign import lib {"lz4_windows_x64_release.lib", "lz4hc_windows_x64_release.lib"}
+        foreign import lib "lz4_windows_x64_release.lib"
     }
 }
 
@@ -254,116 +254,6 @@ foreign lib {
     // 
     // @return : saved dictionary size in bytes (necessarily <= maxDictSize), or 0 if error.
     saveDict :: proc(streamPtr: ^stream_t, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
-
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // LZ4 HC (high compression)
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////
-    // Block Compression
-    //
-
-    // Compress data from `src` into `dst`, using the powerful but slower "HC" algorithm.
-    // `dst` must be already allocated.
-    // Compression is guaranteed to succeed if `dstCapacity >= compressBound(srcSize)` (see "lz4.h")
-    // Max supported `srcSize` value is MAX_INPUT_SIZE (see "lz4.h")
-    // `compressionLevel` : any value between 1 and HC_CLEVEL_MAX will work.
-    // Values > HC_CLEVEL_MAX behave the same as HC_CLEVEL_MAX.
-    // Note: Decompression functions are provided within "lz4.h" (BSD license)
-    //
-    // @return : the number of bytes written into 'dst' or 0 if compression fails.
-    compress_HC :: proc(src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, compressionLevel: c.int) -> c.int ---
-
-
-    // Same as compress_HC(), but using an externally allocated memory segment for `state`.
-    // `state` size is provided by sizeofStateHC().
-    // Memory segment must be aligned on 8-bytes boundaries (which a normal malloc() should do properly).
-    compress_HC_extStateHC :: proc(stateHC: rawptr, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int, compressionLevel: c.int) -> c.int ---
-    sizeofStateHC :: proc() -> c.int ---
-
-
-    // Will compress as much data as possible from `src` to fit into `targetDstSize` budget.
-    // Result is provided in 2 parts :
-    // @return : the number of bytes written into 'dst' (necessarily <= targetDstSize)
-    // or 0 if compression fails.
-    // `srcSizePtr` : on success, *srcSizePtr is updated to indicate how much bytes were read from `src`
-    compress_HC_destSize :: proc(stateHC: rawptr, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int, compressionLevel: c.int) -> c.int ---
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////
-    // Streaming Compression
-    // Bufferless synchronous API
-    //
-
-    // These functions create and release memory for LZ4 HC streaming state.
-    // Newly created states are automatically initialized.
-    // A same state can be used multiple times consecutively,
-    // starting with resetStreamHC_fast() to start a new stream of blocks.
-    createStreamHC :: proc() -> ^streamHC_t ---
-    freeStreamHC :: proc(streamHCPtr: ^streamHC_t) -> c.int ---
-
-    // These functions compress data in successive blocks of any size,
-    // using previous blocks as dictionary, to improve compression ratio.
-    // One key assumption is that previous blocks (up to 64 KB) remain read-accessible while compressing next blocks.
-    // There is an exception for ring buffers, which can be smaller than 64 KB.
-    // Ring-buffer scenario is automatically detected and handled within compress_HC_continue().
-    // 
-    // Before starting compression, state must be allocated and properly initialized.
-    // createStreamHC() does both, though compression level is set to HC_CLEVEL_DEFAULT.
-    // 
-    // Selecting the compression level can be done with resetStreamHC_fast() (starts a new stream)
-    // or setCompressionLevel() (anytime, between blocks in the same stream) (experimental).
-    // resetStreamHC_fast() only works on states which have been properly initialized at least once,
-    // which is automatically the case when state is created using createStreamHC().
-    // 
-    // After reset, a first "fictional block" can be designated as initial dictionary,
-    // using loadDictHC() (Optional).
-    // 
-    // Invoke compress_HC_continue() to compress each successive block.
-    // The number of blocks is unlimited.
-    // Previous input blocks, including initial dictionary when present,
-    // must remain accessible and unmodified during compression.
-    // 
-    // It's allowed to update compression level anytime between blocks,
-    // using setCompressionLevel() (experimental).
-    // 
-    // 'dst' buffer should be sized to handle worst case scenarios
-    // (see compressBound(), it ensures compression success).
-    // In case of failure, the API does not guarantee recovery,
-    // so the state _must_ be reset.
-    // To ensure compression success
-    // whenever `dst` buffer size cannot be made >= compressBound(),
-    // consider using compress_HC_continue_destSize().
-    // 
-    // Whenever previous input blocks can't be preserved unmodified in-place during compression of next blocks,
-    // it's possible to copy the last blocks into a more stable memory space, using saveDictHC().
-    // Return value of saveDictHC() is the size of dictionary effectively saved into 'safeBuffer' (<= 64 KB)
-    // 
-    // After completing a streaming compression,
-    // it's possible to start a new stream of blocks, using the same streamHC_t state,
-    // just by resetting it, using resetStreamHC_fast().
-
-    resetStreamHC_fast :: proc(streamHCPtr: ^streamHC_t, compressionLevel: c.int) ---
-    loadDictHC :: proc(streamHCPtr: ^streamHC_t, dictionary: [^]byte, dictSize: c.int) -> c.int ---
-
-    compress_HC_continue :: proc(streamHCPtr: ^streamHC_t, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int) -> c.int ---
-
-    // Similar to compress_HC_continue(),
-    // but will read as much data as possible from `src`
-    // to fit into `targetDstSize` budget.
-    // Result is provided into 2 parts :
-    // @return : the number of bytes written into 'dst' (necessarily <= targetDstSize)
-    // or 0 if compression fails.
-    // `srcSizePtr` : on success, *srcSizePtr will be updated to indicate how much bytes were read from `src`.
-    // Note that this function may not consume the entire input.
-    compress_HC_continue_destSize :: proc(streamHCPtr: ^streamHC_t, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
-
-    saveDictHC :: proc(streamHCPtr: ^streamHC_t, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
 } // foregin lib
 
 // Note: this doesn't work in odin (for fixed-size arrays).

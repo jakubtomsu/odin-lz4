@@ -3,46 +3,36 @@ package main
 import "core:fmt"
 import "core:mem"
 import "core:slice"
+import "core:os"
 import "../lz4"
+import lz4hc "../lz4hc"
 
 main :: proc() {
-    src := transmute([]u8)string(
-        `Lorem ipsum dolor sit amet, consectetuer adipiscing elit.
-Pellentesque pretium lectus id turpis.
-Nullam at arcu a est sollicitudin euismod.
-Proin pede metus, vulputate nec, fermentum fringilla,
-vehicula vitae, justo. Aliquam erat volutpat. Proin pede metus,
-vulputate nec, fermentum fringilla, vehicula vitae, justo. Nunc
-auctor. Maecenas libero. Integer malesuada. Itaque earum rerum
-hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus
-maiores alias consequatur aut perferendis doloribus asperiores 
-epellat. Fusce nibh. Fusce wisi. Maecenas sollicitudin. Nullam
-sapien sem, ornare ac, nonummy non, lobortis a enim. Quis autem
-vel eum iure reprehenderit qui in ea voluptate velit esse quam
-nihil molestiae consequatur, vel illum qui dolorem eum fugiat
-quo voluptas nulla pariatur? In rutrum. Temporibus autem quibusdam
-`,
-    )
+    if len(os.args) < 2 {
+        fmt.println("Missing argument: please provide a path for test file.")
+        return
+    }
+
+    src := os.read_entire_file(os.args[1]) or_else nil
+    if src == nil do return
 
     fmt.println("Original size:", len(src), "bytes")
 
+    decomp_buf := mem.alloc_bytes(size = len(src), allocator = context.temp_allocator) or_else nil
+    if decomp_buf == nil do return
+
     // Example of using the odin wrapper
     {
-        decomp_buf := mem.alloc_bytes(size = len(src), allocator = context.temp_allocator) or_else nil
-        if decomp_buf == nil do return
-
         ACCELERATIONS :: [?]i32{lz4.ACCELERATION_DEFAULT, 100, 1000, 10000, lz4.ACCELERATION_MAX}
 
         for accel, i in ACCELERATIONS {
             if comp, comp_ok := lz4.compress_slice(src, accel, context.temp_allocator); comp_ok {
-                fmt.print(
-                    "[",
+                fmt.printf(
+                    "[%i] acceleration: % 7i, compressed_size: % 8i (% 5.2f%%), compression_ratio: % 3.2f",
                     i,
-                    "] accel:",
                     accel,
-                    "compressed_size:",
                     len(comp),
-                    "compression_ratio:",
+                    100.0 * f32(len(comp)) / f32(len(src)),
                     f32(len(src)) / f32(len(comp)),
                 )
 
@@ -108,5 +98,25 @@ quo voluptas nulla pariatur? In rutrum. Temporibus autem quibusdam
 
         assert(len(src) == int(decompressed_size), "Decompressed size is different than the source size.")
         assert(slice.equal(src, regen_buffer[:decompressed_size]), "Decompressed contains different data")
+    }
+
+    // HC wrapper example
+    {
+        for clevel, i in lz4hc.CLEVEL_MIN ..< lz4hc.CLEVEL_MAX {
+            if comp, comp_ok := lz4hc.compress_slice(src, i32(clevel), context.temp_allocator); comp_ok {
+                fmt.printf(
+                    "[%i] compression_level: % 3i, compressed_size: % 8i (% 5.2f%%), compression_ratio: % 3.2f",
+                    i,
+                    clevel,
+                    len(comp),
+                    100.0 * f32(len(comp)) / f32(len(src)),
+                    f32(len(src)) / f32(len(comp)),
+                )
+
+                if decomp, decomp_ok := lz4.decompress_slice(comp, decomp_buf); decomp_ok {
+                    fmt.println(" decompressed_correctly:", slice.equal(src, decomp))
+                }
+            }
+        }
     }
 }
