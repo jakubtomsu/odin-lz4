@@ -33,5 +33,7 @@ decompressed := lz4.decompress(compressed, decompressed_buf) or_return
   - block compression
   - streaming compression (WIP: implemented but not fully tested!)
 
+Frame and file support isn't implemented. I might implement them if ever need them.
+
 ## Contributing
 All contributions are welcome! I will merge any pull requests with meaningful work, whether that is small bug fixes, odin helpers or missing API implementation.
