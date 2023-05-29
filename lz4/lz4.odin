@@ -205,13 +205,6 @@ foreign lib {
     // Note3: Before v1.9.0, use LZ4_resetStream() instead
     initStream :: proc(buffer: [^]byte, size: uint) -> ^Stream ---
 
-
-    // An LZ4_Stream structure must be initialized at least once.
-    // This is done with LZ4_initStream(), or LZ4_resetStream().
-    // Consider switching to LZ4_initStream(),
-    // invoking LZ4_resetStream() will trigger deprecation warnings in the future.
-    resetStream :: proc(streamPtr: ^Stream) ---
-
     // Use this to prepare an Stream for a new chain of dependent blocks
     // (e.g., compress_fast_continue()).
     // 

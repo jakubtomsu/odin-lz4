@@ -52,7 +52,6 @@ when ODIN_OS == .Windows {
 
 @(default_calling_convention = "c", link_prefix = "LZ4_")
 foreign lib {
-
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Block Compression
     //
@@ -96,6 +95,10 @@ foreign lib {
     createStreamHC :: proc() -> ^Stream ---
     freeStreamHC :: proc(streamPtr: ^Stream) -> c.int ---
 
+    // Required before first use of a statically allocated LZ4_streamHC_t.
+    // Before v1.9.0 : use LZ4_resetStreamHC() instead
+    initStreamHC :: proc(buffer: [^]byte, size: uint) -> ^Stream ---
+
     // These functions compress data in successive blocks of any size,
     // using previous blocks as dictionary, to improve compression ratio.
     // One key assumption is that previous blocks (up to 64 KB) remain read-accessible while compressing next blocks.
@@ -136,8 +139,8 @@ foreign lib {
     // After completing a streaming compression,
     // it's possible to start a new stream of blocks, using the same Stream state,
     // just by resetting it, using resetStreamHC_fast().
-
     resetStreamHC_fast :: proc(streamPtr: ^Stream, compressionLevel: c.int) ---
+
     loadDictHC :: proc(streamPtr: ^Stream, dictionary: [^]byte, dictSize: c.int) -> c.int ---
 
     compress_HC_continue :: proc(streamPtr: ^Stream, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int) -> c.int ---
@@ -153,7 +156,6 @@ foreign lib {
     compress_HC_continue_destSize :: proc(streamPtr: ^Stream, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
 
     saveDictHC :: proc(streamPtr: ^Stream, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
-
 } // foreign lib
 
 
