@@ -10,16 +10,18 @@ compress_slice :: proc(
     []byte,
     bool,
 ) {
-    if dst, dst_err := mem.alloc_bytes_non_zeroed(
-        int(compressBound(i32(len(src)))),
-        mem.DEFAULT_ALIGNMENT,
-        allocator,
-    ); dst_err == .None {
-        compressed_size := compress_fast(
+    // Bundle the state and result memory into one allocation.
+    // State is stored at the end.
+    compress_bound := int(compressBound(i32(len(src))))
+    state_size := int(sizeofState())
+    if dst, dst_err := mem.alloc_bytes_non_zeroed(compress_bound + state_size, 8, allocator);
+       dst_err == .None {
+        compressed_size := compress_fast_extState(
+            state = &dst[compress_bound],
             src = &src[0],
             dst = &dst[0],
             srcSize = i32(len(src)),
-            dstCapacity = i32(len(dst)),
+            dstCapacity = i32(compress_bound),
             acceleration = acceleration,
         )
 
