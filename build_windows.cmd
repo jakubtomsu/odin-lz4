@@ -1,5 +1,6 @@
 @echo off
 
+
 cl /c c\lz4.c /I c\include /Folz4.obj /Oi /MT /Zi /D_DEBUG /DEBUG
 lib /OUT:lz4\lz4_windows_x64_debug.lib lz4.obj
 

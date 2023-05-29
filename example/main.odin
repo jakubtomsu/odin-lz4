@@ -4,10 +4,14 @@ import "core:fmt"
 import "core:mem"
 import "core:slice"
 import "core:os"
+import "core:time"
+import "core:sys/windows"
 import "../lz4"
 import lz4hc "../lz4hc"
 
 main :: proc() {
+    windows.timeBeginPeriod(1)
+
     if len(os.args) < 2 {
         fmt.println("Missing argument: please provide a path for test file.")
         return
@@ -16,7 +20,7 @@ main :: proc() {
     src := os.read_entire_file(os.args[1]) or_else nil
     if src == nil do return
 
-    fmt.println("Original size:", len(src), "bytes")
+    fmt.printf("Original size: %i (%i MB)\n", len(src), len(src) / mem.Megabyte)
 
     decomp_buf := mem.alloc_bytes(size = len(src), allocator = context.temp_allocator) or_else nil
     if decomp_buf == nil do return
@@ -26,19 +30,32 @@ main :: proc() {
         ACCELERATIONS :: [?]i32{lz4.ACCELERATION_DEFAULT, 100, 1000, 10000, lz4.ACCELERATION_MAX}
 
         for accel, i in ACCELERATIONS {
+            defer fmt.println()
+            start := time.now()
             if comp, comp_ok := lz4.compress_slice(src, accel, context.temp_allocator); comp_ok {
                 fmt.printf(
-                    "[%i] acceleration: % 7i, compressed_size: % 8i (% 5.2f%%), compression_ratio: % 3.2f",
+                    "[%i] accel: % 7i, comp_size: % 8i bytes (%i MB) (% 5.2f%%), ratio: % 3.2f, comp_time: % .2f ms",
                     i,
                     accel,
                     len(comp),
+                    len(comp) / mem.Megabyte,
                     100.0 * f32(len(comp)) / f32(len(src)),
                     f32(len(src)) / f32(len(comp)),
+                    time.duration_milliseconds(time.since(start)),
                 )
 
+                start = time.now()
                 if decomp, decomp_ok := lz4.decompress_slice(comp, decomp_buf); decomp_ok {
-                    fmt.println(" decompressed_correctly:", slice.equal(src, decomp))
+                    fmt.printf(
+                        " decomp_valid: %t, decomp_time: % .2f ms",
+                        slice.equal(src, decomp),
+                        time.duration_milliseconds(time.since(start)),
+                    )
+                } else {
+                    fmt.print(" Failed to decompress.")
                 }
+            } else {
+                fmt.print("Failed to compress.")
             }
         }
     }
@@ -101,22 +118,31 @@ main :: proc() {
     }
 
     // HC wrapper example
-    {
-        for clevel, i in lz4hc.CLEVEL_MIN ..< lz4hc.CLEVEL_MAX {
-            if comp, comp_ok := lz4hc.compress_slice(src, i32(clevel), context.temp_allocator); comp_ok {
-                fmt.printf(
-                    "[%i] compression_level: % 3i, compressed_size: % 8i (% 5.2f%%), compression_ratio: % 3.2f",
-                    i,
-                    clevel,
-                    len(comp),
-                    100.0 * f32(len(comp)) / f32(len(src)),
-                    f32(len(src)) / f32(len(comp)),
-                )
+    for clevel, i in lz4hc.CLEVEL_MIN ..< lz4hc.CLEVEL_MAX {
+        defer fmt.println()
+        start := time.now()
+        if comp, comp_ok := lz4hc.compress_slice(src, i32(clevel), context.temp_allocator); comp_ok {
+            fmt.printf(
+                "[%i] comp_level: % 3i, comp_size: % 8i bytes (%i MB) (% 5.2f%%), ratio: % 3.2f, comp_time: % .2f ms",
+                i,
+                clevel,
+                len(comp),
+                len(comp) / mem.Megabyte,
+                100.0 * f32(len(comp)) / f32(len(src)),
+                f32(len(src)) / f32(len(comp)),
+                time.duration_milliseconds(time.since(start)),
+            )
 
-                if decomp, decomp_ok := lz4.decompress_slice(comp, decomp_buf); decomp_ok {
-                    fmt.println(" decompressed_correctly:", slice.equal(src, decomp))
-                }
+            start = time.now()
+            if decomp, decomp_ok := lz4.decompress_slice(comp, decomp_buf); decomp_ok {
+                fmt.printf(
+                    " decomp_valid: %t, decomp_time: % .2f ms",
+                    slice.equal(src, decomp),
+                    time.duration_milliseconds(time.since(start)),
+                )
             }
+        } else {
+            fmt.print(" Failed to compress.")
         }
     }
 }
