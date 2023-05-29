@@ -17,6 +17,8 @@ main :: proc() {
         return
     }
 
+    fmt.println("arg:", os.args)
+
     src := os.read_entire_file(os.args[1]) or_else nil
     if src == nil do return
 

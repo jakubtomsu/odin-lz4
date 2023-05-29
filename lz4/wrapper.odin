@@ -10,24 +10,28 @@ compress_slice :: proc(
     []byte,
     bool,
 ) {
-    // Bundle the state and result memory into one allocation.
-    // State is stored at the end.
-    compress_bound := int(compressBound(i32(len(src))))
-    state_size := int(sizeofState())
-    if dst, dst_err := mem.alloc_bytes_non_zeroed(compress_bound + state_size, 8, allocator);
-       dst_err == .None {
-        compressed_size := compress_fast_extState(
-            state = &dst[compress_bound],
-            src = &src[0],
-            dst = &dst[0],
-            srcSize = i32(len(src)),
-            dstCapacity = i32(compress_bound),
-            acceleration = acceleration,
-        )
+    if dst, dst_err := mem.alloc_bytes_non_zeroed(
+        int(compressBound(i32(len(src)))),
+        mem.DEFAULT_ALIGNMENT,
+        allocator,
+    ); dst_err == .None {
 
-        if compressed_size > 0 {
-            // Note: we're returing a slice of the original allocation, could that cause issues when deleting..?
-            return dst[:compressed_size], true
+        if state, state_err := mem.alloc_bytes_non_zeroed(int(sizeofState()), 8, context.temp_allocator);
+           state_err == .None {
+
+            compressed_size := compress_fast_extState(
+                state = &state[0],
+                src = &src[0],
+                dst = &dst[0],
+                srcSize = i32(len(src)),
+                dstCapacity = i32(len(dst)),
+                acceleration = acceleration,
+            )
+
+            if compressed_size > 0 {
+                // Note: we're returing a slice of the original allocation, could that cause issues when deleting..?
+                return dst[:compressed_size], true
+            }
         }
 
         delete(dst)

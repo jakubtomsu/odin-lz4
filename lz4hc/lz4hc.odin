@@ -93,8 +93,8 @@ foreign lib {
     // Newly created states are automatically initialized.
     // A same state can be used multiple times consecutively,
     // starting with resetStreamHC_fast() to start a new stream of blocks.
-    createStreamHC :: proc() -> ^stream_t ---
-    freeStreamHC :: proc(streamPtr: ^stream_t) -> c.int ---
+    createStreamHC :: proc() -> ^Stream ---
+    freeStreamHC :: proc(streamPtr: ^Stream) -> c.int ---
 
     // These functions compress data in successive blocks of any size,
     // using previous blocks as dictionary, to improve compression ratio.
@@ -134,13 +134,13 @@ foreign lib {
     // Return value of saveDictHC() is the size of dictionary effectively saved into 'safeBuffer' (<= 64 KB)
     // 
     // After completing a streaming compression,
-    // it's possible to start a new stream of blocks, using the same stream_t state,
+    // it's possible to start a new stream of blocks, using the same Stream state,
     // just by resetting it, using resetStreamHC_fast().
 
-    resetStreamHC_fast :: proc(streamPtr: ^stream_t, compressionLevel: c.int) ---
-    loadDictHC :: proc(streamPtr: ^stream_t, dictionary: [^]byte, dictSize: c.int) -> c.int ---
+    resetStreamHC_fast :: proc(streamPtr: ^Stream, compressionLevel: c.int) ---
+    loadDictHC :: proc(streamPtr: ^Stream, dictionary: [^]byte, dictSize: c.int) -> c.int ---
 
-    compress_HC_continue :: proc(streamPtr: ^stream_t, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int) -> c.int ---
+    compress_HC_continue :: proc(streamPtr: ^Stream, src: [^]byte, dst: [^]byte, srcSize: c.int, maxDstSize: c.int) -> c.int ---
 
     // Similar to compress_HC_continue(),
     // but will read as much data as possible from `src`
@@ -150,17 +150,17 @@ foreign lib {
     // or 0 if compression fails.
     // `srcSizePtr` : on success, *srcSizePtr will be updated to indicate how much bytes were read from `src`.
     // Note that this function may not consume the entire input.
-    compress_HC_continue_destSize :: proc(streamPtr: ^stream_t, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
+    compress_HC_continue_destSize :: proc(streamPtr: ^Stream, src: [^]byte, dst: [^]byte, srcSizePtr: ^c.int, targetDstSize: c.int) -> c.int ---
 
-    saveDictHC :: proc(streamPtr: ^stream_t, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
+    saveDictHC :: proc(streamPtr: ^Stream, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
 
 } // foreign lib
 
 
 // PRIVATE DEFINITIONS :
 // Do not use these definitions directly.
-// They are merely exposed to allow static allocation of `stream_t`.
-// Declare an `stream_t` directly, rather than any type below.
+// They are merely exposed to allow static allocation of `Stream`.
+// Declare an `Stream` directly, rather than any type below.
 // Even then, only do so in the context of static linking, as definitions may change between versions.
 
 DICTIONARY_LOGSIZE :: 16
@@ -172,7 +172,7 @@ HASHTABLESIZE :: (1 << HASH_LOG)
 HASH_MASK :: (HASHTABLESIZE - 1)
 
 // Never ever use these definitions directly !
-// Declare or allocate an stream_t instead.
+// Declare or allocate an Stream instead.
 CCtx_internal :: struct {
     hashTable:        [HASHTABLESIZE]u32,
     chainTable:       [MAXD]u16,
@@ -191,7 +191,7 @@ CCtx_internal :: struct {
 // static size, for inter-version compatibility
 STREAM_MINSIZE :: 262200
 
-// stream_t :
+// Stream :
 // This structure allows static allocation of LZ4 HC streaming state.
 // This can be used to allocate statically on stack, or as part of a larger structure.
 // 
@@ -202,7 +202,7 @@ STREAM_MINSIZE :: 262200
 // Using the normal builder, a newly created state is automatically initialized.
 // 
 // Static allocation shall only be used in combination with static linking.
-stream_t :: struct #raw_union {
+Stream :: struct #raw_union {
     minStateSize:      [STREAM_MINSIZE]byte,
     internal_donotuse: CCtx_internal,
 }
