@@ -147,4 +147,14 @@ main :: proc() {
             fmt.print(" Failed to compress.")
         }
     }
+
+    // Memcpy time for comparison
+    {
+        start := time.now()
+        mem.copy(&decomp_buf[0], &src[0], len(src))
+        fmt.printf(
+            "mem.copy time for decompression comparison: % .2f ms\n",
+            time.duration_milliseconds(time.since(start)),
+        )
+    }
 }
