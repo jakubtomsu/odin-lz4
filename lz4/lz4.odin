@@ -186,21 +186,42 @@ foreign lib {
     //
 
     // Allocates a stream with the LZ4 allocation functions.
-    createStream :: proc() -> ^stream_t ---
+    createStream :: proc() -> ^Stream ---
 
     // Free stream from createStream
-    freeStream :: proc(streamPtr: ^stream_t) -> c.int ---
+    freeStream :: proc(streamPtr: ^Stream) -> c.int ---
 
-    // Use this to prepare an stream_t for a new chain of dependent blocks
+    // An LZ4_Stream structure must be initialized at least once.
+    // This is automatically done when invoking LZ4_createStream(),
+    // but it's not when the structure is simply declared on stack (for example).
+    // 
+    // Use LZ4_initStream() to properly initialize a newly declared LZ4_Stream.
+    // It can also initialize any arbitrary buffer of sufficient size,
+    // and will @return a pointer of proper type upon initialization.
+    // 
+    // Note : initialization fails if size and alignment conditions are not respected.
+    // In which case, the function will @return NULL.
+    // Note2: An LZ4_Stream structure guarantees correct alignment and size.
+    // Note3: Before v1.9.0, use LZ4_resetStream() instead
+    initStream :: proc(buffer: [^]byte, size: uint) -> ^Stream ---
+
+
+    // An LZ4_Stream structure must be initialized at least once.
+    // This is done with LZ4_initStream(), or LZ4_resetStream().
+    // Consider switching to LZ4_initStream(),
+    // invoking LZ4_resetStream() will trigger deprecation warnings in the future.
+    resetStream :: proc(streamPtr: ^Stream) ---
+
+    // Use this to prepare an Stream for a new chain of dependent blocks
     // (e.g., compress_fast_continue()).
     // 
-    // An stream_t must be initialized once before usage.
+    // An Stream must be initialized once before usage.
     // This is automatically done when created by createStream().
-    // However, should the stream_t be simply declared on stack (for example),
+    // However, should the Stream be simply declared on stack (for example),
     // it's necessary to initialize it first, using initStream().
     // 
     // After init, start any new stream with resetStream_fast().
-    // A same stream_t can be re-used multiple times consecutively
+    // A same Stream can be re-used multiple times consecutively
     // and compress multiple streams,
     // provided that it starts each new stream with resetStream_fast().
     // 
@@ -211,9 +232,9 @@ foreign lib {
     // in the context of streaming compression.
     // The *extState* functions perform their own resets.
     // Invoking resetStream_fast() before is redundant, and even counterproductive.
-    resetStream_fast :: proc(streamPtr: ^stream_t) ---
+    resetStream_fast :: proc(streamPtr: ^Stream) ---
 
-    // Use this function to reference a static dictionary into stream_t.
+    // Use this function to reference a static dictionary into Stream.
     // The dictionary must remain available during compression.
     // loadDict() triggers a reset, so any previous data will be forgotten.
     // The same dictionary will have to be loaded on decompression side for successful decoding.
@@ -223,7 +244,7 @@ foreign lib {
     // Loading a size of 0 is allowed, and is the same as reset.
     //
     // @return : loaded dictionary size, in bytes (necessarily <= 64 KB)
-    loadDict :: proc(streamPtr: ^stream_t, dictionary: [^]byte, dictSize: c.int) -> c.int ---
+    loadDict :: proc(streamPtr: ^Stream, dictionary: [^]byte, dictSize: c.int) -> c.int ---
 
     // Compress 'src' content using data from previously compressed blocks, for better compression ratio.
     // 'dst' buffer must be already allocated.
@@ -245,7 +266,7 @@ foreign lib {
     // Note 4 : If input buffer is a ring-buffer, it can have any size, including < 64 KB.
     // 
     // Note 5 : After an error, the stream status is undefined (invalid), it can only be reset or freed.
-    compress_fast_continue :: proc(streamPtr: ^stream_t, src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
+    compress_fast_continue :: proc(streamPtr: ^Stream, src: [^]byte, dst: [^]byte, srcSize: c.int, dstCapacity: c.int, acceleration: c.int) -> c.int ---
 
     // If last 64KB data cannot be guaranteed to remain available at its current memory location,
     // save it into a safer place (char* safeBuffer).
@@ -253,7 +274,7 @@ foreign lib {
     // but is much faster, because saveDict() doesn't need to rebuild tables.
     // 
     // @return : saved dictionary size in bytes (necessarily <= maxDictSize), or 0 if error.
-    saveDict :: proc(streamPtr: ^stream_t, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
+    saveDict :: proc(streamPtr: ^Stream, safeBuffer: [^]byte, maxDictSize: c.int) -> c.int ---
 } // foregin lib
 
 // Note: this doesn't work in odin (for fixed-size arrays).
@@ -277,10 +298,10 @@ HASHTABLESIZE :: 1 << MEMORY_USAGE
 HASH_SIZE_U32 :: 1 << HASHLOG /* required as macro for static allocation */
 
 @(private)
-stream_t_internal :: struct {
+Stream_Internal :: struct {
     hashTable:     [HASH_SIZE_U32]u32,
     dictionary:    [^]byte,
-    dictCtx:       ^stream_t_internal,
+    dictCtx:       ^Stream_Internal,
     currentOffset: u32,
     tableType:     u32,
     dictSize:      u32,
@@ -291,7 +312,7 @@ stream_t_internal :: struct {
 STREAM_MINSIZE :: ((1 << MEMORY_USAGE) + 32)
 
 // Never use this directly, this is here only for static allocation.
-stream_t :: struct #raw_union {
+Stream :: struct #raw_union {
     minStateSize:      [STREAM_MINSIZE]byte,
-    internal_donotuse: stream_t_internal,
+    internal_donotuse: Stream_Internal,
 }
