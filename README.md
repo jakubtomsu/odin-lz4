@@ -14,6 +14,7 @@ Compress data:
 ```odin
 data := [?]byte{1, 2, 3, 4, 5}
 compressed := lz4.compress_slice(data) or_return
+// HC is _much_ slower to compress, but very fast to decompress.
 hc_compressed := lz4hc.compress_slice(data) or_return
 ```
 
