@@ -3,3 +3,5 @@
 *.ilk
 *.exp
 .vs/
+*.o
+*.obj
