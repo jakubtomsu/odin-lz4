@@ -1,4 +1,4 @@
-package main
+package lz4_demo
 
 import "core:fmt"
 import "core:mem"
