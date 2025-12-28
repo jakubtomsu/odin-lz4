@@ -43,10 +43,30 @@ CLEVEL_OPT_MIN :: 10
 CLEVEL_MAX :: 12
 
 when ODIN_OS == .Windows {
-    when ODIN_DEBUG {
-        foreign import lib "lz4hc_windows_x64_debug.lib"
+    when ODIN_ARCH == .amd64 {
+        when ODIN_DEBUG {
+            foreign import lib "lz4hc_windows_x64_debug.lib"
+        } else {
+            foreign import lib "lz4hc_windows_x64_release.lib"
+        }
     } else {
-        foreign import lib "lz4hc_windows_x64_release.lib"
+        #assert(false, "Sorry, unsupported os architecture")
+    }
+}
+
+when ODIN_OS == .Darwin {
+    when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
+        foreign import lib "lz4hc_macos_universal.a"
+    } else {
+        #assert(false, "Sorry, unsupported os architecture")
+    }
+}
+
+when ODIN_OS == .Linux {
+    when ODIN_ARCH == .amd64 {
+        foreign import lib "lz4hc_linux_x64.a"
+    } else {
+        #assert(false, "Sorry, unsupported os architecture")
     }
 }
 

@@ -10,7 +10,9 @@ import "../lz4"
 import lz4hc "../lz4hc"
 
 main :: proc() {
-    windows.timeBeginPeriod(1)
+    when ODIN_OS == .Windows {
+        windows.timeBeginPeriod(1)
+    }
 
     if len(os.args) < 2 {
         fmt.println("Missing argument: please provide a path for test file.")
